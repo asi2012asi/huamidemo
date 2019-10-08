@@ -1,0 +1,7 @@
+<resources>
+    <string name="app_name">HuamiDemo</string>
+    <string name="send">发送测试1</string>
+    <string name="send2">发送测试2</string>
+    <string name="server">作为服务器</string>
+    <string name="edit_hint1">10.193.4.203:1024</string>
+</resources>
