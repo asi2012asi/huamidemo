@@ -68,6 +68,7 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
                 tvResult.append("server:\n" + msg.obj + "\n");
             }else if(msg.what == 2){
                 Toast.makeText(MainActivity.this,"服务器收到了",Toast.LENGTH_LONG).show();
+                tvResult.append("server:\n" + msg.obj + "\n");
             }
         }
 
@@ -117,7 +118,7 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
 //                String ipString = "10.192.167.7";
 
                 //华为手机
-                String ipString = "10.193.4.203";
+                String ipString = "192.168.43.131";
                 int port = PORT_NUM;
                 if (!TextUtils.isEmpty(edIp.getText())) {
                     String[] split = edIp.getText().toString().split(":");
