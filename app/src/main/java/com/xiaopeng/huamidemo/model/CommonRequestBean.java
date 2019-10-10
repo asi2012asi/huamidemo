@@ -1,4 +1,4 @@
-package com.xiaopeng.huamidemo;
+package com.xiaopeng.huamidemo.model;
 
 public class CommonRequestBean {
 

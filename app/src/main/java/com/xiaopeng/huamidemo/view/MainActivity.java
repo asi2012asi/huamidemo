@@ -1,10 +1,11 @@
-package com.xiaopeng.huamidemo;
+package com.xiaopeng.huamidemo.view;
 
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.Message;
 import android.support.v7.app.AppCompatActivity;
 import android.text.TextUtils;
+import android.util.Log;
 import android.view.View;
 import android.widget.Button;
 import android.widget.EditText;
@@ -12,6 +13,8 @@ import android.widget.TextView;
 import android.widget.Toast;
 
 import com.google.gson.Gson;
+import com.xiaopeng.huamidemo.model.CommonRequestBean;
+import com.xiaopeng.huamidemo.R;
 
 import java.io.BufferedReader;
 import java.io.IOException;
@@ -22,6 +25,10 @@ import java.net.ServerSocket;
 import java.net.Socket;
 import java.net.SocketTimeoutException;
 
+/**
+ * @author luyaoming
+ * 华米手表调试用demo
+ */
 public class MainActivity extends AppCompatActivity implements View.OnClickListener {
     private static final String TAG = "MainActivity";
 
@@ -33,6 +40,9 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
     private EditText edIp;
     private static final int PORT_NUM = 1024;
     private Button btnServer;
+    private Socket socket;
+    //默认ip
+    private String ipString = "172.20.10.1";
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -52,9 +62,19 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
 
     }
 
+    @Override
+    protected void onDestroy() {
+        super.onDestroy();
+        try {
+            if (socket != null) {
+                socket.close();
+            }
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+    }
+
     private void sendMsg(String inputContent) {
-        //                String inputContent = input.getText().toString();
-//        String inputContent = null;
         tvResult.append("client:\n" + inputContent + "\n");
         //启动线程 向服务器发送和接收信息
         new MyThread(inputContent).start();
@@ -66,8 +86,8 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
         public void handleMessage(Message msg) {
             if (msg.what == 1) {
                 tvResult.append("server:\n" + msg.obj + "\n");
-            }else if(msg.what == 2){
-                Toast.makeText(MainActivity.this,"服务器收到了",Toast.LENGTH_LONG).show();
+            } else if (msg.what == 2) {
+                Toast.makeText(MainActivity.this, "服务器收到了", Toast.LENGTH_LONG).show();
                 tvResult.append("server:\n" + msg.obj + "\n");
             }
         }
@@ -90,9 +110,9 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
             bean.setTarget_id(20015);
             content2 = new Gson().toJson(bean);
             sendMsg("测试按钮2 发送:" + content2);
-        }else if(v.getId() == R.id.btn_server){
+        } else if (v.getId() == R.id.btn_server) {
             startServerThread();
-            Toast.makeText(MainActivity.this,"请在输入框中输入本机的ip和端口",Toast.LENGTH_LONG).show();
+            Toast.makeText(MainActivity.this, "请在输入框中输入本机的ip和端口", Toast.LENGTH_LONG).show();
         }
     }
 
@@ -108,36 +128,33 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
         public void run() {
             //定义消息
             Message msg = null;
+            //向服务器发送信息
+            int dataLength = content.getBytes().length;
+            Log.i(TAG,"数据长度 = "+dataLength);
             try {
-                //连接服务器 填写对方服务器的地址 并设置连接超时为5秒
-                Socket socket = new Socket();
-                //http://10.192.148.71/
-
-                //晓波手机
-//                String ipString = "10.192.169.133";
-//                String ipString = "10.192.167.7";
-
-                //华为手机
-                String ipString = "192.168.43.131";
-                int port = PORT_NUM;
-                if (!TextUtils.isEmpty(edIp.getText())) {
-                    String[] split = edIp.getText().toString().split(":");
-                    if (split != null) {
-                        ipString = split[0];
-                        port = Integer.valueOf(split[1]);
+                if (socket == null || !socket.isConnected()) {
+                    int port = PORT_NUM;
+                    if (!TextUtils.isEmpty(edIp.getText())) {
+                        String[] split = edIp.getText().toString().split(":");
+                        if (split != null) {
+                            ipString = split[0];
+                            port = Integer.valueOf(split[1]);
+                        }
                     }
+                    socket = new Socket();
+                    //连接服务器 填写对方服务器的地址 并设置连接超时为5秒
+                    socket.connect(new InetSocketAddress(ipString, port), 5000);
+                    msg = myHandler.obtainMessage(1);
+                    msg.obj = "准备连接" + ipString + ":" + port;
+                    myHandler.sendMessage(msg);
                 }
-                msg = myHandler.obtainMessage(1);
-                msg.obj = "准备连接"+ipString+":"+port;
-                myHandler.sendMessage(msg);
-                socket.connect(new InetSocketAddress(ipString, port), 5000);
 
                 //获取输入输出流
                 OutputStream ou = socket.getOutputStream();
                 //获取输出输出流
                 BufferedReader bff = new BufferedReader(new InputStreamReader(
                         socket.getInputStream()));
-                //向服务器发送信息
+                ou.write(intToByte4B(dataLength));
                 ou.write(content.getBytes("utf-8"));
                 ou.flush();
 
@@ -154,7 +171,8 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
                 //关闭各种输入输出流
                 bff.close();
                 ou.close();
-                socket.close();
+                //不需要每次都重新建立连接
+//                socket.close();
             } catch (SocketTimeoutException aa) {
                 //连接超时 在UI界面显示消息
                 msg = myHandler.obtainMessage(1);
@@ -175,7 +193,17 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
     }
 
 
-    private void startServerThread(){
+    public static byte[] intToByte4B(int n) {
+        byte[] b = new byte[4];
+        b[0] = (byte) (n >> 24 & 0xff); //数据组起始位,存放内存起始位, 即:高字节在前
+        b[1] = (byte) (n >> 16 & 0xff); //高字节在前是与java存放内存一样的, 与书写顺序一样
+        b[2] = (byte) (n >> 8 & 0xff);
+        b[3] = (byte) (n & 0xff);
+        return b;
+    }
+
+
+    private void startServerThread() {
         new Thread() {
             public void run() {
                 OutputStream output;
